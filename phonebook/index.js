@@ -52,9 +52,21 @@ app.delete('/api/persons/:id', (request, response) => {
     response.status(204).end();
 })
 
+const checkNameExists = (name) => {
+  return persons.some(person => person.name === name);
+}
 app.post('/api/persons/', (request, response) => {
     const body = request.body;
-    console.log(body);
+    if(!body.name || !body.number)
+      return response.status(400).json({ 
+        error: 'name/number is missing' 
+      });
+    
+    if(checkNameExists(body.name))
+      return response.status(400).json({
+        error: 'name already exists in server'
+      });
+
     const newPerson = {
       'id': Math.floor((Math.random() * 1000 + 1)),
       'name': body.name,
