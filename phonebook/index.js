@@ -68,7 +68,24 @@ app.delete('/api/persons/:id', (request, response) => {
     persons = persons.filter(person => person.id !== id);
     response.status(204).end();
 })
-
+app.put('/api/persons/:id', (request, response) => {
+    const id = Number(request.params.id);
+    const body = request.body;
+    if(!(body.name || body.number || body.id))
+      return response.status(400).json({ 
+        error: 'name/number/id is missing' 
+      });
+    const updatedPerson = {
+      'id': body.id,
+      'name': body.name,
+      'number': body.number,
+    }
+    persons = persons.map(person => {
+      if(person.id === id) return updatedPerson;
+      else return person;
+    });
+    response.json(updatedPerson);
+})
 const checkNameExists = (name) => {
   return persons.some(person => person.name === name);
 }
