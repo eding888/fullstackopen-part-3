@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
+const Person = require("./models/person");
 const app = express();
 app.use(express.json());
 app.use(morgan(function (tokens, req, res) {
@@ -18,6 +20,8 @@ app.use(morgan(function (tokens, req, res) {
 }));
 app.use(cors());
 app.use(express.static('build'));
+
+
 let persons = [
     { 
       "id": 1,
@@ -43,7 +47,9 @@ let persons = [
 
 let date = new Date();
 app.get('/api/persons', (request, response) => {
-    response.json(persons);
+    Person.find({}).then(persons => {
+      response.json(persons);
+    })
 });
 
 app.get('/info', (request, response) => {
@@ -86,6 +92,7 @@ app.put('/api/persons/:id', (request, response) => {
     });
     response.json(updatedPerson);
 })
+
 const checkNameExists = (name) => {
   return persons.some(person => person.name === name);
 }
@@ -101,16 +108,20 @@ app.post('/api/persons/', (request, response) => {
         error: 'name already exists in server'
       });
 
-    const newPerson = {
-      'id': Math.floor((Math.random() * 1000 + 1)),
-      'name': body.name,
-      'number': body.number
-    };
-    persons.push(newPerson);
-    response.json(newPerson);
+    const newPerson = new Person({
+      id: date.getTime(),
+      name: body.name,
+      number: body.number
+    });
+
+    if(body.id) newPerson.id = body.id;
+    
+    newPerson.save().then(savedPerson => {
+      response.json(savedPerson);
+    })
 })
 
-const PORT = process.env.PORT || 8080
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
-})
+});
