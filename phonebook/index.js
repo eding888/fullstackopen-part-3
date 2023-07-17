@@ -22,6 +22,22 @@ app.use(cors());
 app.use(express.static('build'));
 
 
+const checkExistanceAndUpdateResponse = (req, res, next) => {
+  res.checkExistanceAndRespond = (obj, responseCode) => {
+    if(obj){
+      if(responseCode) 
+        res.status(responseCode).end()
+        .catch(error => next(error));
+      else res.json(obj);
+    }
+    else res.status(404).end();
+  }
+
+  next();
+}
+
+app.use(checkExistanceAndUpdateResponse);
+
 let persons = [
     { 
       "id": 1,
@@ -46,35 +62,45 @@ let persons = [
 ];
 
 let date = new Date();
-app.get('/api/persons', (request, response) => {
-    Person.find({}).then(persons => {
-      response.json(persons);
-    })
+
+
+
+app.get('/api/persons', (request, response, next) => {
+    Person.where({})
+      .then(persons => {
+        response.checkExistanceAndRespond(persons);
+      })
+      .catch(error => next(error));
 });
 
-app.get('/info', (request, response) => {
+app.get('/info', (request, response, next) => {
     date = new Date();
     response.send(
-        `<div>Phonebook has info for ${persons.length} people.</div>
+        `<div>Phonebook has info for ${persons.length} Person.</div>
          <div>${date.toString()}</div>`
     );
 });
 
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id);
-    const personAtID = persons.find(person => person.id === id);
+app.get('/api/persons/:id', (request, response, next) => {
+    const id = request.params.id;
 
-    if(personAtID) response.json(personAtID);
-    else response.status(404).end();
+    Person.where({id}).findOne()
+      .then(person => {
+        response.checkExistanceAndRespond(person);
+      })
+      .catch(error => next(error));
+})
+
+app.delete('/api/persons/:id', (request, response, next) => {
+    const id = Number(request.params.id);
+    Person.findOneAndDelete({id: id})
+      .then(person => {
+        response.checkExistanceAndRespond(person, 204);
+      })
+      .catch(error => next(error));
     
 })
-
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id);
-    persons = persons.filter(person => person.id !== id);
-    response.status(204).end();
-})
-app.put('/api/persons/:id', (request, response) => {
+app.put('/api/persons/:id', (request, response, next) => {
     const id = Number(request.params.id);
     const body = request.body;
     if(!(body.name || body.number || body.id))
@@ -86,17 +112,17 @@ app.put('/api/persons/:id', (request, response) => {
       'name': body.name,
       'number': body.number,
     }
-    persons = persons.map(person => {
-      if(person.id === id) return updatedPerson;
-      else return person;
-    });
-    response.json(updatedPerson);
+    Person.findOneAndUpdate({id: id}, updatedPerson)
+      .then(person => {
+        response.checkExistanceAndRespond(person);
+      })
+      .catch(error => next(error));
 })
 
 const checkNameExists = (name) => {
   return persons.some(person => person.name === name);
 }
-app.post('/api/persons/', (request, response) => {
+app.post('/api/persons/', (request, response, next) => {
     const body = request.body;
     if(!body.name || !body.number)
       return response.status(400).json({ 
@@ -120,6 +146,19 @@ app.post('/api/persons/', (request, response) => {
       response.json(savedPerson);
     })
 })
+
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  } 
+
+  next(error)
+}
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
